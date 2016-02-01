@@ -226,10 +226,23 @@ indexHtml = L.renderText
            L.form_ $ do
              mconcat (map inp [5..10])
              submit
-         L.aside_ introText
+         L.aside_ $ do
+           introText
+           L.br_ [] <> L.br_ []
+           creditText
   where
   inp i = L.input_ [L.type_ "radio", L.name_ "players", L.value_ (textNum i)]
        <> L.toHtml (textNum i) <> L.br_ []
+
+creditText :: L.Html ()
+creditText =
+  L.p_ [L.style_ "text-align:right"] $ do
+    "Sources (including Monte Carlo simulator):"
+    L.br_ []
+    let src = "https://github.com/leepike/theresistance"
+    L.a_ [L.href_ src] (L.toHtml src)
+    L.br_ []
+    "Author: (c) Lee Pike, 2016"
 
 introText :: L.Html ()
 introText = do
@@ -256,7 +269,9 @@ gameHtml (c,g) = L.renderText
            mkNext
            L.br_ [] <> L.br_ []
            mkMission
-         L.aside_ gameText
+         L.aside_ $ do
+           gameText
+           creditText
   where
   mkMission =
     if gameEnd g == None
