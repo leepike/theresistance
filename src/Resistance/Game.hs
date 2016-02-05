@@ -25,10 +25,10 @@ import Data.List hiding (group)
 import MonadLib hiding (Id)
 import Control.Exception.Base (assert)
 
---import Debug.Trace
 
 ------------------------------------------------------------
 -- Misc functions
+
 cntError :: String -> Cnt -> a
 cntError nm n = error $ nm ++ " unimplemented for " ++ show n
 
@@ -146,7 +146,7 @@ failCards :: [MissionCard] -> Int
 failCards cards = length (filter (== Fail) cards)
 
 -- Select yourself and the remaining lowest probability players.
-missionSelection :: Id -> Int -> SpyProb -> [Id]
+missionSelection :: MissionSelection
 missionSelection idx sz spyProb =
   reverse $ fst $ foldl' go ([],1) sortedKeys
   where
@@ -158,7 +158,7 @@ missionSelection idx sz spyProb =
   sortedKeys = map fst sorted
 
 -- Select the lowest probability players.
-missionSelection1 :: Id -> Int -> SpyProb -> [Id]
+missionSelection1 :: MissionSelection
 missionSelection1 _idx sz spyProb =
   reverse $ fst $ foldl' go ([],0) sortedKeys
   where
@@ -193,15 +193,18 @@ initSpyProb c p = M.fromList $ map ((,p)) (players c)
 
 -- Bayes Theorem.
 bayesThm :: Prob -> Prob -> Prob -> Prob
-bayesThm pa pb pba =
-  let pab = (pba * pa) / pb in
-  assert (probAssert pab) pab
+bayesThm pa pb pba
+  | pb == 0.0
+  = 0.0
+  | otherwise
+  = let pab = (pba * pa) / pb in
+    assert (probAssert pab) pab
 
 -- Given a list of players, the number of spies, and a spy probability map,
 -- returns the probability that those players contain the number of spies
 -- asserted.
 spyProbConfig :: [Id] -> Int -> SpyProb -> Prob
-spyProbConfig ls spyCnt spyProb = res
+spyProbConfig ls spyCnt spyProb = assert (spyCnt >= 0) res
   where
   spyCombs = comb' spyCnt ls
   res      = foldl' go 0 spyCombs
@@ -216,37 +219,39 @@ spyProbConfig ls spyCnt spyProb = res
 -- A: idx is a spy.
 -- B: The set of players has the number number of spies asserted.
 -- Computes P(A|B) using Bayes Theorem.
-spyProbUpdate :: Config -> SpyProb -> Id -> Prob
-spyProbUpdate c spyProb idx = bayesThm pa pb pba
+bayesSpyProb :: Config -> SpyProb -> Id -> Prob
+bayesSpyProb c spyProb idx = bayesThm pa pb pba
   where
-  as  = players c
+  p   = players c
   s   = totalSpies c
   pa  = getSpyProb spyProb idx
-  pb  = spyProbConfig as s spyProb
-  pba = spyProbConfig (as \\ [idx]) (s - 1) spyProb
+  pb  = spyProbConfig p s spyProb
+  pba | s == 0    = 0.0
+      | otherwise = spyProbConfig (p \\ [idx]) (s-1) spyProb
 
 -- Given a set of configuration (set of player ids and number of spies), update
 -- their spy probabilities for the set number of spies.
 bayesSpyUpdate :: Config -> SpyProb -> SpyProb
-bayesSpyUpdate c spyProb =
-  assert (   res + 0.0001 >= s
-          && res - 0.0001 <= s
-         ) sp
+bayesSpyUpdate c spyProb = sp
   where
-  ids     = players c
-  res     = sum $ map (getSpyProb sp) ids
-  s       = fromIntegral (totalSpies c)
-  sp      = foldl' go spyProb ids
-  go p i  = updateSpyProb p (i, spyProbUpdate c spyProb i)
+  ids = players c
+  sp  = foldl' go spyProb ids
+    where go p i = updateSpyProb p (i, bayesSpyProb c spyProb i)
 
 -- Up
 bayesGameUpdate :: Config -> [Id] -> [MissionCard] -> SpyProb -> SpyProb
-bayesGameUpdate c group cards spyProb = sp'
+bayesGameUpdate c group cards spyProb =
+  let res = sum $ map (getSpyProb spyProb') (players c) in
+  let s   = fromIntegral (totalSpies c) in
+  -- Sanity check, modulo floating point error
+  assert (   res + 0.0001 >= s
+          && res - 0.0001 <= s
+         ) spyProb'
   where
   f        = failCards cards
   spGroup  = bayesSpyUpdate (Config group f) spyProb
   remSpies = totalSpies c - f
-  sp'      = bayesSpyUpdate (Config (players c \\ group) remSpies) spGroup
+  spyProb' = bayesSpyUpdate (Config (players c \\ group) remSpies) spGroup
 
 ------------------------------------------------------------
 -- Game setup
@@ -274,8 +279,8 @@ initialGame c =
 -- Running the game
 
 -- Assumes a valid step can be taken.
-stepGame :: Config -> Game -> [MissionCard] -> Game
-stepGame c g cards = do
+stepGame :: MissionSelection -> Config -> Game -> [MissionCard] -> Game
+stepGame ms c g cards = do
   let i        = currentPlayer g
   let t        = totalPlayers c
   let np       = nextPlayer t i
@@ -283,10 +288,12 @@ stepGame c g cards = do
   let rnd      = currentRnd g
   let rnd'     = rnd + 1
   let sz'      = missionSize t rnd'
-  let spyProb' = bayesGameUpdate c (missionPlayers g) cards spyProb
+  let spyProb' | failCards cards == 0 = spyProb
+               | otherwise            =
+                   bayesGameUpdate c (missionPlayers g) cards spyProb
   let g' = g { currentPlayer    = np
              , currentRnd       = rnd'
-             , missionPlayers   = missionSelection1 np sz' spyProb'
+             , missionPlayers   = ms np sz' spyProb'
              }
   if missionSuccess c rnd cards
     then g' { points         = resistancePoint (points g)
