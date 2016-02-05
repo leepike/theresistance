@@ -12,6 +12,7 @@ import qualified Lucid.Base as L
 import qualified Lucid.Html5 as L
 import qualified Web.Scotty as S
 
+import Control.Monad (void)
 import Data.Monoid (mempty, mconcat, (<>))
 import qualified Data.Text as TT
 import qualified Data.Text.Lazy as T
@@ -63,7 +64,7 @@ routes = do
           Nothing
             -> S.html $ gameHtml $ (c,g)
           Just f
-            -> do let g' = stepGame c g (toCards c g f)
+            -> do let g' = stepGame missionSelection1 c g (toCards c g f)
                   S.html $ gameHtml $ (c,g')
                   redirectGameRoute (c,g')
 
@@ -118,7 +119,7 @@ parseFailCards params = do
 -- vote failed?
 parseNext :: [S.Param] -> Maybe ()
 parseNext params = do
-  lookup "next" params
+  void (lookup "next" params)
   return ()
 
 ------------------------------------------------------------

@@ -3,7 +3,6 @@
 module Resistance.Types where
 
 import Control.Applicative
-import MonadLib hiding (Id)
 import qualified MonadLib as L
 --import qualified Data.Array.Unboxed as A
 import qualified Data.Set as S
@@ -39,7 +38,10 @@ type SpyProb = M.Map Id Prob
 data Config = Config
   { players    :: [Id]
   , totalSpies :: !Cnt
-  } deriving (Show, Read, Eq)
+  }
+  deriving (Show, Read, Eq)
+
+type MissionSelection = Id -> Int -> SpyProb -> [Id]
 
 data Game = Game
   { points           :: Points
@@ -52,17 +54,27 @@ data Game = Game
 data Winner = None | Resistance | Spies
   deriving (Show, Read, Eq, Ord)
 
-type Wins = M.Map Winner Integer
+-- (Resistance, Spies)
+data Wins = Wins
+  { resistanceWins :: Integer
+  , spyWins        :: Integer
+  } deriving (Show, Read, Eq)
+
+prettyShowWins :: Wins -> String
+prettyShowWins (Wins r s) =
+  let total = fromInteger (r+s) in
+  "Resistance: " ++ show r ++ " (" ++ show (fromInteger r/total)
+    ++ ") Spies: " ++ show s ++ " (" ++ show (fromInteger s/total) ++ ")"
 
 -- Resistance monad
-newtype R a = R { unR :: StateT Game L.Id a }
+newtype R a = R { unR :: L.StateT Game L.Id a }
   deriving (Functor, Applicative, Monad)
 
 getGame :: R Game
-getGame = R get
+getGame = R L.get
 
 setGame :: Game -> R ()
-setGame = R . set
+setGame = R . L.set
 
 runR :: Game -> R a -> (a, Game)
-runR game r = runId $ runStateT game (unR r)
+runR game r = L.runId $ L.runStateT game (unR r)
