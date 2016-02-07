@@ -12,6 +12,7 @@ import qualified Lucid.Base as L
 import qualified Lucid.Html5 as L
 import qualified Web.Scotty as S
 
+import qualified Text.Printf as T
 import Control.Monad (void)
 import Data.Monoid (mempty, mconcat, (<>))
 import qualified Data.Text as TT
@@ -187,7 +188,7 @@ prettySpyProb :: SpyProb -> [T.Text]
 prettySpyProb spyProb =
   map go (M.toList spyProb)
   where
-  go (i,p) = T.pack $ "Player " ++ show i ++ ": " ++ show p
+  go (i,p) = T.pack $ "Player " ++ show i ++ ": " ++ T.printf "%.4f\n" p
 
 gameToHtml :: Game -> [L.Html ()]
 gameToHtml
