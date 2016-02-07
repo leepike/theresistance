@@ -8,12 +8,13 @@ import Resistance.Types
 import Resistance.Game
 
 import Data.List (foldl', intersect)
-import Control.Monad.MC as MC
-import Control.Monad.Primitive as MC
+import qualified Control.Monad.MC as MC
+import qualified Control.Monad.Primitive as MC
+import qualified Text.Printf as T
 
 ------------------------------------------------------------
 
-initSpies :: PrimMonad m => Config -> MC.MC m Spies
+initSpies :: MC.PrimMonad m => Config -> MC.MC m Spies
 initSpies c = do
   ls <- MC.shuffle (players c)
   return $ take ns ls
@@ -32,7 +33,7 @@ runGame ms cs c s = do
     Resistance -> return Resistance
     Spies      -> return Spies
 
-mkGame :: PrimMonad m => MissionSelection -> CardSelect -> Config -> MC.MC m Winner
+mkGame :: MC.PrimMonad m => MissionSelection -> CardSelect -> Config -> MC.MC m Winner
 mkGame ms cs c = do
   s <- initSpies c
   let (w, _) = runR (initialGame c) (runGame ms cs c s)
@@ -45,42 +46,58 @@ updateWinMap ws w =
     Resistance -> ws { resistanceWins = resistanceWins ws + 1 }
     Spies      -> ws { spyWins = spyWins ws + 1 }
 
-runMonteCarlo :: MissionSelection -> CardSelect -> Int -> Seed -> Config -> Wins
+runMonteCarlo :: MissionSelection -> CardSelect -> Int -> MC.Seed -> Config -> Wins
 runMonteCarlo ms cs reps seed config =
     foldl' updateWinMap (Wins 0 0)
   $ MC.replicateMC reps (mkGame ms cs config) (MC.mt19937 seed)
 
-overConfigs :: MissionSelection -> CardSelect -> Int -> Seed -> [(String, Wins)]
+overConfigs :: MissionSelection -> CardSelect -> Int -> MC.Seed -> [Wins]
 overConfigs ms cs reps seed =
-  map (\i -> (show i, runMonteCarlo ms cs reps seed (validConfig i))) [5..10]
+  map (\i -> runMonteCarlo ms cs reps seed (validConfig i)) [5..10]
 
-selectionStrats :: [(String, MissionSelection)]
-selectionStrats =
+type ResistanceStrat = (String, MissionSelection)
+
+resistanceStrats :: [ResistanceStrat]
+resistanceStrats =
   [ ("select self"  , missionSelection)
   , ("select lowest", missionSelection1)
   ]
 
-spyStrats :: [(String, CardSelect)]
+type SpyStrat = (String, CardSelect)
+
+spyStrats :: [SpyStrat]
 spyStrats =
   [ ("selectAll" , cardSelectAll)
   , ("hide 1st"  , cardSelectHide1st)
   , ("select opt", cardSelectOpt)
   ]
 
-allCombs :: Int -> Seed -> [(String, String, String, Wins)]
-allCombs reps seed = do
-  ms  <- selectionStrats
+allCombs :: [(ResistanceStrat, SpyStrat)]
+allCombs = do
+  ms  <- resistanceStrats
   cs  <- spyStrats
-  res <- overConfigs (snd ms) (snd cs) reps seed
-  return (fst ms, fst cs, fst res, snd res)
+  return (ms, cs)
 
-printEach :: [(String, String, String, Wins)] -> IO ()
-printEach ls = mapM_ go ls
+prettyShowWins :: Wins -> String
+prettyShowWins (Wins r s) =
+  let total :: Double
+      total = fromInteger (r+s) in
+  T.printf "R: %-4d (%.4f) S: %-4d (%.4f)" r (fromInteger r/total) s (fromInteger s/total)
+
+printEach :: Int -> MC.Seed -> IO ()
+printEach reps seed = mapM_ go allCombs
   where
-  go (a,b,c,w) = do
-    print [a,b,c]
-    print (prettyShowWins w)
-    putStrLn "------------------------------"
+  go :: (ResistanceStrat, SpyStrat) -> IO ()
+  go (rs,ss) = do
+    let res = overConfigs (snd rs) (snd ss) reps seed
+    T.printf "Strategies: %s (R) %s (S)\n" (fst rs) (fst ss)
+    T.printf "-------------------------------------\n"
+    mapM_ printSizes (zip [5..10] res)
+    T.printf "\n"
+
+  printSizes :: (Int, Wins) -> IO ()
+  printSizes (i,wins) =
+    T.printf "%-2d %s\n" i (prettyShowWins wins)
 
 main :: IO ()
 main = do
@@ -88,7 +105,7 @@ main = do
   seed <- readLn
   putStrLn "Enter number of reps"
   reps <- readLn
-  printEach (allCombs reps seed)
+  printEach reps seed
 
   -- print $ runMonteCarlo missionSelection1 cardSelectAll reps seed (validConfig 9)
 

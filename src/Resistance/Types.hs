@@ -60,12 +60,6 @@ data Wins = Wins
   , spyWins        :: Integer
   } deriving (Show, Read, Eq)
 
-prettyShowWins :: Wins -> String
-prettyShowWins (Wins r s) =
-  let total = fromInteger (r+s) in
-  "Resistance: " ++ show r ++ " (" ++ show (fromInteger r/total)
-    ++ ") Spies: " ++ show s ++ " (" ++ show (fromInteger s/total) ++ ")"
-
 -- Resistance monad
 newtype R a = R { unR :: L.StateT Game L.Id a }
   deriving (Functor, Applicative, Monad)
