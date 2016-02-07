@@ -3,7 +3,8 @@
 
 name:                resistance
 version:             0.1.0.0
-synopsis:            Resistance Game Monte-Carlo
+synopsis:            Resistance Game simulator
+description:         https://en.wikipedia.org/wiki/The_Resistance_(game)
 license:             BSD3
 license-file:        LICENSE
 author:              Lee Pike
@@ -14,7 +15,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 source-repository    this
   type:     git
-  location: ??
+  location: https://github.com/leepike/theresistance
   tag:      ??
 
 library
