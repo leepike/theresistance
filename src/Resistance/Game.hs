@@ -15,6 +15,7 @@ module Resistance.Game
   , validConfig
   , numSpies
   , nextPlayer
+  , spyProbConfig
   , bayesGameUpdate
   ) where
 
@@ -238,7 +239,6 @@ bayesSpyUpdate c spyProb = sp
   sp  = foldl' go spyProb ids
     where go p i = updateSpyProb p (i, bayesSpyProb c spyProb i)
 
--- Up
 bayesGameUpdate :: Config -> [Id] -> [MissionCard] -> SpyProb -> SpyProb
 bayesGameUpdate c group cards spyProb =
   let res = sum $ map (getSpyProb spyProb') (players c) in
