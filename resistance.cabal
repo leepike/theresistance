@@ -22,7 +22,7 @@ library
   exposed-modules: Resistance.Types
                  , Resistance.Game
   other-extensions: GeneralizedNewtypeDeriving, StandaloneDeriving, OverloadedStrings
-  build-depends: base >=4.7 && <4.8
+  build-depends: base >=4.7
                , containers
                , monadLib
                , primitive
