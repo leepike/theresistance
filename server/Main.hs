@@ -42,20 +42,22 @@ routes = do
               redirectGameRoute (c,g)
               -- S.html (gameHtml (c,g))
 
--- Route: totalplayers/points/currentRnd/currentPlayer/spyProbability
+-- Route: totalplayers/points/currentRnd/currentPlayer/spyProbability/spyGroups
 -- E.g.: 5/(1,2)/3/4/[(0,0.5),(1,0.5),(2,0.5),(3,0.5),(4,0.5)]/[2,3]
-  S.get "/:totalplayers/:points/:currentrnd/:currentplayer/:spyprobability/:missionplayers/" $ do
+  S.get "/:totalplayers/:points/:currentrnd/:currentplayer/:spyprobability/:spygroups/:missionplayers/" $ do
     ls <- S.params
     tp   <- S.param "totalplayers"
     ps   <- S.param "points"
     r    <- S.param "currentrnd"
     p    <- S.param "currentplayer"
     prob <- S.param "spyprobability"
+    sg   <- S.param "spygroups"
     mp   <- S.param "missionplayers"
     let ps'   = parsePoints ps
     let prob' = parseSpyProbability prob
+    let sg'   = parseSpyGroups sg
     let mp'   = parseMissionPlayers mp
-    let (c,g) = fromRoute tp ps' r p prob' mp'
+    let (c,g) = fromRoute tp ps' r p prob' sg' mp'
     case parseNext ls of
       Just ()
         -> redirectGameRoute (c,failedVote (c,g))
@@ -109,6 +111,9 @@ parseSpyProbability :: T.Text -> SpyProb
 parseSpyProbability p =
   M.fromList $ read (T.unpack p)
 
+parseSpyGroups :: T.Text -> SpyGroups
+parseSpyGroups = read . T.unpack
+
 parseMissionPlayers :: T.Text -> [Id]
 parseMissionPlayers = read . T.unpack
 
@@ -144,6 +149,7 @@ gameRoute (c,g) =
     , toText (currentRnd g)
     , toText (currentPlayer g)
     , spyProbRoute (spyProbability g)
+    , toText (spyGroups g)
     , toText (missionPlayers g)
     ]
 
@@ -160,16 +166,17 @@ fromRoute :: Cnt
           -> Int
           -> Id
           -> SpyProb
+          -> SpyGroups
           -> [Id]
           -> (Config, Game)
-fromRoute tp ps r p prob mp =
+fromRoute tp ps r p prob sg mp =
   let c = validConfig tp in
   let g = Game { points         = ps
                , currentRnd     = r
                , currentPlayer  = p
                , spyProbability = prob
                , missionPlayers = mp
-               , spyGroups      = emptySpyGroup
+               , spyGroups      = sg
                }
   in (c,g)
 

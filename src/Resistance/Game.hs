@@ -29,7 +29,6 @@ import Data.Maybe (isJust)
 import MonadLib hiding (Id)
 import Control.Exception.Base (assert)
 
-
 ------------------------------------------------------------
 -- Misc functions
 
