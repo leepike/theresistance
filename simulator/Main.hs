@@ -61,6 +61,7 @@ resistanceStrats :: [ResistanceStrat]
 resistanceStrats =
   [ ("select self"  , missionSelection)
   , ("select lowest", missionSelection1)
+  , ("select logic" , missionSelection2)
   ]
 
 type SpyStrat = (String, CardSelect)

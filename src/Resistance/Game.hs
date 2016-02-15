@@ -11,18 +11,21 @@ module Resistance.Game
   , missionSuccess
   , missionSelection
   , missionSelection1
+  , missionSelection2
   , totalPlayers
   , validConfig
   , numSpies
   , nextPlayer
   , spyProbConfig
   , bayesGameUpdate
+  , emptySpyGroup
   ) where
 
 import Resistance.Types
 
 import qualified Data.Map.Strict as M
 import Data.List hiding (group)
+import Data.Maybe (isJust)
 import MonadLib hiding (Id)
 import Control.Exception.Base (assert)
 
@@ -148,26 +151,46 @@ failCards cards = length (filter (== Fail) cards)
 
 -- Select yourself and the remaining lowest probability players.
 missionSelection :: MissionSelection
-missionSelection idx sz spyProb =
-  reverse $ fst $ foldl' go ([],1) sortedKeys
+missionSelection c game =
+  reverse $ foldl' go [idx] sortedKeys
   where
-  go (ls,cnt) i | i == idx  = (i:ls,cnt)
-                | cnt < sz  = (i:ls,cnt+1)
-                | otherwise = (ls,cnt)
+  idx     = currentPlayer game
+  sz      = missionSize (totalPlayers c) (currentRnd game)
+  spyProb = spyProbability game
+  go ls i | length ls < sz  = i:ls
+          | otherwise       = ls
   sorted     = sortBy (\a b -> compare (snd a) (snd b))
-                      (M.assocs spyProb)
+                      (M.assocs (M.delete idx spyProb))
   sortedKeys = map fst sorted
 
 -- Select the lowest probability players.
 missionSelection1 :: MissionSelection
-missionSelection1 _idx sz spyProb =
-  reverse $ fst $ foldl' go ([],0) sortedKeys
+missionSelection1 c game =
+  reverse $ foldl' go [] sortedKeys
   where
-  go (ls,cnt) i | cnt < sz  = (i:ls,cnt+1)
-                | otherwise = (ls,cnt)
+  sz      = missionSize (totalPlayers c) (currentRnd game)
+  spyProb = spyProbability game
+
+  go ls i | length ls < sz  = i:ls
+          | otherwise       = ls
   sorted     = sortBy (\a b -> compare (snd a) (snd b))
                       (M.assocs spyProb)
   sortedKeys = map fst sorted
+
+-- Select the lowest probability players unless doing guarantees getting a spy.
+missionSelection2 :: MissionSelection
+missionSelection2 c game =
+    head -- XXX assume non-empty
+  $ sortBy (\a b -> compare (sumProb a) (sumProb b))
+  $ possible
+
+  where
+  possible   = filter (not . isSpyGroup sg) (comb' sz (players c))
+  sumProb ls = sum (map (getSpyProb sp) ls)
+
+  sp = spyProbability game
+  sz = missionSize (totalPlayers c) (currentRnd game)
+  sg = spyGroups game
 
 ------------------------------------------------------------
 
@@ -254,6 +277,25 @@ bayesGameUpdate c group cards spyProb =
   spyProb' = bayesSpyUpdate (Config (players c \\ group) remSpies) spGroup
 
 ------------------------------------------------------------
+
+------------------------------------------------------------
+-- Logic
+
+equalGroup :: [Id] -> [Id] -> Bool
+equalGroup g0 g1 = sort g0 == sort g1
+
+isSpyGroup :: SpyGroups -> [Id] -> Bool
+isSpyGroup groups group = isJust $ find (equalGroup group) groups
+
+insertSpyGroup :: [Id] -> SpyGroups -> SpyGroups
+insertSpyGroup group groups = group : groups
+
+emptySpyGroup :: SpyGroups
+emptySpyGroup = []
+
+------------------------------------------------------------
+
+------------------------------------------------------------
 -- Game setup
 
 initialPoints :: Points
@@ -265,6 +307,7 @@ initialGame c =
        , currentRnd       = 0
        , currentPlayer    = 0
        , spyProbability   = probs
+       , spyGroups        = emptySpyGroup
        , missionPlayers   = mp
        }
   where
@@ -287,21 +330,22 @@ stepGame ms c g cards = do
   let spyProb  = spyProbability g
   let rnd      = currentRnd g
   let rnd'     = rnd + 1
-  let sz'      = missionSize t rnd'
+  let mp       = missionPlayers g
+  let sg       = spyGroups g
+  let sg'      | failCards cards == 0 = sg
+               | otherwise            = insertSpyGroup mp sg
   let spyProb' | failCards cards == 0 = spyProb
                | otherwise            =
-                   bayesGameUpdate c (missionPlayers g) cards spyProb
-  let g' = g { currentPlayer    = np
+                   bayesGameUpdate c mp cards spyProb
+  let g1 = g { currentPlayer    = np
              , currentRnd       = rnd'
-             , missionPlayers   = ms np sz' spyProb'
+             , spyProbability   = spyProb'
+             , spyGroups        = sg'
              }
+  let g2 = g1 { missionPlayers = ms c g1 }
   if missionSuccess c rnd cards
-    then g' { points         = resistancePoint (points g)
-            , spyProbability = spyProb'
-            }
-    else g' { points         = spyPoint (points g)
-            , spyProbability = spyProb'
-            }
+    then g2 { points = resistancePoint (points g) }
+    else g2 { points = spyPoint (points g) }
 
 -- Termination condition for the game.
 gameEnd :: Game -> Winner
@@ -395,11 +439,14 @@ _test4 = run (_mkSP [0.3,0.2,0.2,0.7])
     print sp'
     if sp == sp' then return () else run sp'
 
-_test5 :: [Id]
-_test5 = missionSelection1 2 3
-          (M.fromList [(0,0.75),(1,0.25),(2,0.9),(3,0.01)])
+_test5 :: IO ()
+_test5 = do
+  let c = mkConfig 5
+  print $ missionSelection2 c (initialGame c)
 
-
+-- _test5 :: [Id]
+-- _test5 = missionSelection1 2 3
+--           (M.fromList [(0,0.75),(1,0.25),(2,0.9),(3,0.01)])
 
 
 -- cards are [T,F] played by 3,4

@@ -41,13 +41,16 @@ data Config = Config
   }
   deriving (Show, Read, Eq)
 
-type MissionSelection = Id -> Int -> SpyProb -> [Id]
+type MissionSelection = Config -> Game -> [Id]
+
+type SpyGroups = [[Id]]
 
 data Game = Game
   { points           :: Points
   , currentRnd       :: !Rnd
   , currentPlayer    :: !Id
   , spyProbability   :: SpyProb
+  , spyGroups        :: SpyGroups
   , missionPlayers   :: [Id]
   } deriving (Show, Eq)
 

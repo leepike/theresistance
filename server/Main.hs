@@ -65,7 +65,7 @@ routes = do
           Nothing
             -> S.html $ gameHtml $ (c,g)
           Just f
-            -> do let g' = stepGame missionSelection1 c g (toCards c g f)
+            -> do let g' = stepGame missionSelection2 c g (toCards c g f)
                   S.html $ gameHtml $ (c,g')
                   redirectGameRoute (c,g')
 
@@ -169,6 +169,7 @@ fromRoute tp ps r p prob mp =
                , currentPlayer  = p
                , spyProbability = prob
                , missionPlayers = mp
+               , spyGroups      = emptySpyGroup
                }
   in (c,g)
 
@@ -188,7 +189,7 @@ prettySpyProb :: SpyProb -> [T.Text]
 prettySpyProb spyProb =
   map go (M.toList spyProb)
   where
-  go (i,p) = T.pack $ "Player " ++ show i ++ ": " ++ T.printf "%.4f\n" p
+  go (i,p) = T.pack $ "Player " ++ show i ++ ": " ++ T.printf "%.6f\n" p
 
 gameToHtml :: Game -> [L.Html ()]
 gameToHtml
