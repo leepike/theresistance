@@ -41,9 +41,9 @@ library
 
 executable simulator
   main-is:             Main.hs
-  build-depends:       base >=4.7 && <4.8
+  build-depends:       base >=4.7
                      , resistance
-                     , monte-carlo >=0.6 && <0.7
+                     , monte-carlo >=0.6
                      , containers
                      , primitive
                      , array
@@ -57,7 +57,7 @@ executable simulator
 
 executable server
   main-is:             Main.hs
-  build-depends:       base >=4.7 && <4.8
+  build-depends:       base >=4.7
                      , resistance
                      , containers
                      , primitive
